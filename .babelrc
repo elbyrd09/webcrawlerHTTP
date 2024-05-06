@@ -1,0 +1,9 @@
+{
+  "presets": [
+    "@babel/preset-env"
+  ],
+  "plugins": [
+    ["babel-plugin-transform-esmodules", { "loose": true }] // You can adjust the "loose" option if needed
+  ]
+}
+
