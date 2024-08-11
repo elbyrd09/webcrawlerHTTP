@@ -3,8 +3,37 @@ const { JSDOM } = require('jsdom')
 
 
 
-async function crawlPage(currentURL){
+async function crawlPage(baseURL, currentURL, pages){
+	// to crawl just 1 page, the crawlPage(currentURL) is sufficient
+	// to crawl an entire site, we need the function to take 3 arguments
+	// baseURL is the homepage of the site (currentURL has to be on same domain as baseURL)
+	// currentURL is the page actively crawling
+	// pages object tracks pages crawled so far
+
+	const baseURLObj = new URL(baseURL)
+	const currentURLObj = new URL(currentURL)
+	if (baseURLObj.hostname !== currentURLObj.hostname) {
+		// if the host names are different, we'll just skip the page
+		// since it would mean the currentURL doesn't live on the same
+		// domain as the baseURL
+		return pages
+	}
+
+	const normalizedCurrentURL = normalizeURL(currentURL)
+	// the way we can check if we've already crawled the page
+	// is to determine if the currentURL existed in the pages object
+	// the pages object is a map of normalized URLs to the # of times
+	// we've seen the given URL
+	if (pages[normalizedCurrentURL] > 0){
+		pages[normalizedCurrentURL]++
+		return pages
+	}
+
+	pages[normalizedCurrentURL] = 1
+
 	console.log(`actively crawling: ${currentURL}`)
+	// only want to log this when we're crawling a new page
+
 
 	try{
 		const resp = await fetch(currentURL)
@@ -12,7 +41,7 @@ async function crawlPage(currentURL){
 		// validate that we're getting back a valid response that is not a 400 or 500 error level
 		if (resp.status > 399){
 			console.log(`error in fetch with status code: ${resp.status} on page: ${currentURL}`)
-			return
+			return pages
 			// we'll stop crawling the page with 'return'
 		}
 
@@ -24,20 +53,37 @@ async function crawlPage(currentURL){
 			// does NOT include "text/html".  using !== will still allow an output like
 			/// "text/html; charset=UTF-8" to fail when it should pass
 			console.log(`non html response: ${contentType} on page: ${currentURL}`)
-			return
+			return pages
 		}
 
 
 		// we want either a 200 or 300 level response code
 
-		console.log(await resp.text())
+		const htmlBody = await resp.text();
 		// using the text method since the getURLsFromHTML takes 
 		// data as a string as opposed to fetch which I'm more used to
 		// getting data in JSON format
 
+
+		const nextURLs = getURLsFromHTML(htmlBody, baseURL)
+
+		for(const nextURL of nextURLs){
+
+			pages = await crawlPage(baseURL, nextURL, pages)
+
+			// crawl root page, find all links, and then crawl pages within root
+			// either we're hitting links external to site
+			// or we're hitting links we've already crawled
+			// it is an exhaustive crawl
+
+		}
+
+
 	}catch(err){
 		console.log(`error in fetch: ${err.message}, on page: ${currentURL}`)
 	}
+
+	return pages
 
 }
 
